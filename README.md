@@ -5,9 +5,17 @@
 ## Repository layout
 
 ```text
-analysis/    twitter_analysis.py (PySpark job), smoke_local.py, day1_smoke_test.py
-backend/     main.py (FastAPI) + data/part-*.csv (Spark output, synced from GCS)
-frontend/    index.html (fetch → "UserID has N of followers/followees")
+.
+├── analysis/
+│   ├── twitter_analysis.py   # PySpark job: parse → dedupe → count → full outer join → CSV
+│   ├── smoke_local.py        # Local pure-Python mirror of the Spark logic (tests + sample)
+│   └── day1_smoke_test.py    # Dataproc smoke job (data validity check)
+├── backend/
+│   ├── main.py               # FastAPI: GET /api/users/{id}, hosts the front-end
+│   └── data/part-*.csv       # Spark output CSV (synced from GCS)
+├── frontend/
+│   └── index.html            # fetch() → renders "UserID has N of followers/followees"
+└── README.md
 ```
 
 ## Prerequisites
@@ -34,7 +42,14 @@ uvicorn main:app --host 127.0.0.1 --port 8000
 
 Open http://127.0.0.1:8000/ — the page fetches both required users automatically; a search box queries any of the 81,306 users.
 
-- API: `GET /api/users/{user_id}` → `{"user_id": "...", "followers": N, "followees": M}` (404 if unknown)
+### Verify the API (open a second PowerShell window)
+
+```powershell
+curl.exe http://127.0.0.1:8000/api/users/214328887
+curl.exe http://127.0.0.1:8000/api/users/107830991
+```
+
+Expected: `{"user_id":"214328887","followers":180,"followees":214}` and `{"user_id":"107830991","followers":180,"followees":157}` (unknown IDs return 404).
 
 ## 3. Re-run the analysis (Dataproc / PySpark)
 
