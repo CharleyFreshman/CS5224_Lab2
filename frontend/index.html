@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CS5224 Lab2 — Twitter Follower Stats</title>
+<style>
+  body { font-family: Consolas, monospace; max-width: 720px; margin: 40px auto; }
+  h1 { font-size: 20px; }
+  #results div { font-size: 18px; padding: 4px 0; }
+  #search { margin: 16px 0; }
+  #search input { font: inherit; padding: 6px 8px; width: 220px; }
+  #search button { font: inherit; padding: 6px 14px; }
+  #error { color: #b00020; }
+</style>
+</head>
+<body>
+<h1>Twitter follower / followee statistics</h1>
+<div id="results">Loading...</div>
+<div id="search">
+  <input id="uid" placeholder="user id, e.g. 214328887">
+  <button id="go">Query</button>
+  <span id="error"></span>
+</div>
+<script>
+const API = "/api/users/";
+
+// Render two lines per user: "ID has N of followers" / "ID has N of followees"
+async function show(id) {
+  const res = await fetch(API + id);
+  const box = document.getElementById("results");
+  const err = document.getElementById("error");
+  if (!res.ok) {
+    err.textContent = `user ${id} not found`;
+    return false;
+  }
+  err.textContent = "";
+  const u = await res.json();
+  const div = document.createElement("div");
+  div.innerHTML =
+    `${u.user_id} has ${u.followers} of followers<br>` +
+    `${u.user_id} has ${u.followees} of followees`;
+  box.appendChild(div);
+  return true;
+}
+
+async function main() {
+  const box = document.getElementById("results");
+  box.innerHTML = "";
+  // Required demo users
+  for (const id of ["214328887", "107830991"]) {
+    await show(id);
+  }
+}
+
+document.getElementById("go").onclick = () => {
+  const id = document.getElementById("uid").value.trim();
+  if (id) show(id);
+};
+
+main();
+</script>
+</body>
+</html>
