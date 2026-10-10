@@ -7,10 +7,12 @@ Full-stack data analytics pipeline: **Twitter dataset → Google Cloud Storage �
 ```text
 .
 ├── analysis/
-│   └── twitter_analysis.py   # PySpark job: parse → dedupe → count → full outer join → CSV
+│   ├── twitter_analysis.py   # PySpark job: parse → dedupe → count → full outer join → CSV
+│   ├── smoke_local.py        # Local pure-Python mirror of the Spark logic (tests + sample)
+│   └── day1_smoke_test.py    # Dataproc smoke job (data validity check)
 ├── backend/
 │   ├── main.py               # FastAPI: GET /api/users/{id}, hosts the front-end
-│   └── data/                 # Spark output CSV (synced from GCS)
+│   └── data/part-*.csv       # Spark output CSV (synced from GCS)
 ├── frontend/
 │   └── index.html            # fetch() → renders "UserID has N of followers/followees"
 └── README.md
@@ -45,20 +47,30 @@ gcloud storage rsync gs://cs5224-twitter-ssf/outputs/twitter_stats backend/data 
 ## Re-run the data analysis (Dataproc / PySpark)
 
 ```bash
-gsutil cp analysis/twitter_analysis.py gs://<bucket>/scripts/
+# 0. create a transient cluster (then delete it when done)
+gcloud dataproc clusters create cs5224-day3-final --region=asia-southeast1 \
+  --image-version=2.2 --num-workers=2 \
+  --master-machine-type=e2-standard-2 --worker-machine-type=e2-standard-2 \
+  --master-boot-disk-size=50 --worker-boot-disk-size=50 --no-address
 
-gcloud dataproc jobs submit pyspark gs://<bucket>/scripts/twitter_analysis.py \
-  --cluster=<cluster> \
-  -- gs://<bucket>/raw/twitter_combined.txt \
-     gs://<bucket>/outputs/twitter_stats \
-     gs://<bucket>/outputs/twitter_summary \
+# 1. upload the job script
+gcloud storage cp analysis/twitter_analysis.py gs://cs5224-twitter-ssf/scripts/
+
+# 2. submit — args: <input> <output_csv> <summary> [ids]
+#    (on PowerShell, wrap in a .bat file: gcloud.ps1 otherwise swallows "--")
+gcloud dataproc jobs submit pyspark gs://cs5224-twitter-ssf/scripts/twitter_analysis.py \
+  --cluster=cs5224-day3-final --region=asia-southeast1 \
+  --properties spark:spark.sql.shuffle.partitions=16,spark:spark.default.parallelism=16 \
+  -- gs://cs5224-twitter-ssf/raw/twitter_combined.txt \
+     gs://cs5224-twitter-ssf/outputs/twitter_stats \
+     gs://cs5224-twitter-ssf/outputs/twitter_summary \
      214328887,107830991
 ```
 
-Local smoke test (no Spark needed):
+Local smoke test (no Spark needed — pass the raw dataset path):
 
 ```bash
-python analysis/smoke_local.py
+python analysis/smoke_local.py --file /path/to/twitter_combined.txt
 ```
 
 ## Results
